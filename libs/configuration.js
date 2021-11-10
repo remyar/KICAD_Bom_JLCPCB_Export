@@ -9,8 +9,8 @@ var Config = {
     CurrentWorkingPath: null,
     TemplateFolder: null,
     version: 1,
-    outputType: "FILE", // FILE or PDF
-    templatePath: "HTML",
+    outputType: process.env.OUTPUT_FILE_TYPE ? process.env.OUTPUT_FILE_TYPE : "FILE", // FILE or PDF
+    templatePath: process.env.OUTPUT_TEMPLATE_PATH ? process.env.OUTPUT_TEMPLATE_PATH : "HTML",
     tempFilePath: null, // holds the where we will savet he temp file while we run our process. note this is usually where the template folder is located
     keepTempFile: false, // if treu then the tempfile that is generated is not deleted
     output: "",
@@ -195,7 +195,7 @@ function LoadOld(parameter) {
         Common.Error('output file parameter is missing')
     }
     Config.input.path = ValidateAndReturnPath(parameter[2])
-    Config.input.ext = Path.extname(Config.input.path)
+    Config.input.ext = Path.extname(Config.input.path);
     Config.input.basename = Path.basename(Config.input.path, Config.input.ext)
 
     Config.output = { path: '', basename: '', ext: '' }
@@ -215,7 +215,11 @@ function LoadOld(parameter) {
     if (parameter[4]) {
         Config.templatePath = ValidateAndReturnPath(parameter[4], true)
     } else {
-        Config.templatePath = ValidateAndReturnPath('HTML', true)
+        if ( Config.output.ext.toUpperCase() == ".CSV" ){
+            Config.templatePath = ValidateAndReturnPath('CSV', true);
+        } else {
+            Config.templatePath = ValidateAndReturnPath('HTML', true);
+        }
     }
     return Config
 }

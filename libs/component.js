@@ -1,5 +1,6 @@
 const Common = require('./common.js');
 const Path = require('path');
+const { throws } = require('assert');
 
 /**
 *   Defines KiCad Revision number
@@ -88,12 +89,16 @@ function ExtractAndSortComponents(config) {
 
         if (Part.fields) {
             Part.fields.forEach(function (value) {
-                value.field.forEach(function (value) {
-                    if (Components.sortMeta.fields.indexOf(value.$.name) === -1) {
-                        // if the returned index is -1 then we know  that we know we don't have this item
-                        Components.sortMeta.fields.push(value.$.name)
+                if (value.field) {
+                    if (value.field.length) {
+                        value.field.forEach(function (value) {
+                            if (Components.sortMeta.fields.indexOf(value.$.name) === -1) {
+                                // if the returned index is -1 then we know  that we know we don't have this item
+                                Components.sortMeta.fields.push(value.$.name)
+                            }
+                        })
                     }
-                })
+                }
             })
         }
     })
@@ -104,9 +109,13 @@ function ExtractAndSortComponents(config) {
 
         if (Part.fields) {
             Part.fields.forEach(function (value) {
-                value.field.forEach(function (value) {
-                    TempFieldHolder[value.$.name] = value['_']
-                })
+                if (value.field) {
+                    if (value.field.length) {
+                        value.field.forEach(function (value) {
+                            TempFieldHolder[value.$.name] = value['_']
+                        })
+                    }
+                }
             })
         }
 
@@ -124,7 +133,15 @@ function ExtractAndSortComponents(config) {
             DatasheetValue = Part.datasheet[0]
         }
 
-        var TempPart = { Value: Part.value[0], Count: 1, Ref: [], Fields: TempFieldHolder, Datasheet: DatasheetValue, Footprint: FootprintValue, RefPrefix: Part.$.ref.replace(/[0-9]/g, '') }
+        var TempPart = {
+            Value: Part.value[0],
+            Count: 1,
+            Ref: [],
+            Fields: TempFieldHolder,
+            Datasheet: DatasheetValue,
+            Footprint: FootprintValue,
+            RefPrefix: Part.$.ref.replace(/[0-9]/g, '')
+        }
 
         PartIndex = SearchUniquePartIndex(Components.UniquePartList, TempPart, Components.sortMeta.fields)
 
@@ -138,12 +155,16 @@ function ExtractAndSortComponents(config) {
 
             if (Part.fields) {
                 Part.fields.forEach(function (value) {
-                    value.field.forEach(function (value) {
-                        if (Components.sortMeta.fields.indexOf(value.$.name) === -1) {
-                            // if the returned index is -1 then we don't have this part
-                            Components.sortMeta.fields.push(value.$.name)
+                    if (value.field) {
+                        if (value.field.length) {
+                            value.field.forEach(function (value) {
+                                if (Components.sortMeta.fields.indexOf(value.$.name) === -1) {
+                                    // if the returned index is -1 then we don't have this part
+                                    Components.sortMeta.fields.push(value.$.name)
+                                }
+                            })
                         }
-                    })
+                    }
                 })
             }
 
@@ -295,29 +316,197 @@ async function LoadComponentFromXML(config) {
     })
 }
 
-async function LoadAndProcessComponentList(config) {
-    return new Promise(async (resolve, reject) => {
-        var TheLoaded = null
-        // check if this is a supported file type
+async function LoadComponentFromNET(config) {
 
-        switch (config.input.ext.toUpperCase()) {
-            case '.XML':
-                TheLoaded = LoadComponentFromXML
-                break;
-            default:
-                return reject('input file not supported')
+    const is = require('is-js');
+    const R = require('ramda');
+    const Parse = require('s-expression');
+    const NETFile = require('fs')
+
+    var arrayPaths = [
+        'export.components.comp',
+        'export.libparts.libpart',
+        'export.libparts.libpart.pins',
+        'export.libparts.libpart.pins.pin',
+        'export.libparts.libpart.fields',
+        'export.libparts.libpart.fields.field',
+        'export.libraries.library',
+        'export.nets.net',
+        'export.nets.net.node'
+    ];
+
+    function objectify(input) {
+        if (is.string(input)) {
+            return input;
         }
 
-        try{
-            // run the file loaded
-            await TheLoaded(config);
-            ExtractAndSortComponents(config);
-            ApplaySort(config);
-            resolve(Components);
-        } catch(error){
-            return reject(error);
+        var key = input.shift();
+
+        var output = {};
+        output[key] = input.length === 1 ? input[0] : input.map(objectify);
+        return output;
+    }
+
+    function stringify(input) {
+        if (is.array(input) || is.string(input)) {
+            return input;
+        }
+        var output = '';
+        for (var i = 0; i in input; i++) {
+            output += input[i];
+        }
+        return output.length > 0 ? output : input;
+    }
+
+    function unnestify(input, path) {
+
+        function getNewPath(key) {
+            return path + (path ? '.' : '') + key;
+        }
+
+        var key;
+        input = stringify(input);
+        var output = {};
+
+        if (is.string(input)) {
+            output = input;
+        } else if (is.array(input)) {
+            input.forEach(function (obj) {
+                if (is.string(obj)) {
+                    if (!output.$) {
+                        output.$ = [];
+                    }
+                    output.$.push(obj);
+                    return;
+                }
+
+                for (key in obj) {
+                    if (obj.hasOwnProperty(key)) {
+                        var objVal = unnestify(obj[key], getNewPath(key));
+                        if (!(key in output)) {
+                            output[key] = [objVal];
+                        } else {
+                            output[key].push(objVal);
+                        }
+                    }
+                }
+            });
+
+            for (key in output) {
+                if (output.hasOwnProperty(key)) {
+                    if (!R.contains(getNewPath(key), arrayPaths)) {
+                        var array = output[key];
+                        if (array.length === 1) {
+                            output[key] = array[0];
+                        }
+                    }
+                }
+            }
+        } else {  // object
+            for (key in input) {
+                if (input.hasOwnProperty(key)) {
+                    output[key] = unnestify(input[key], getNewPath(key));
+                }
+            }
+        }
+
+        return output;
+    }
+
+    return new Promise(function (resolve, reject) {
+
+        try {
+            let kicadNetlist = NETFile.readFileSync(Path.resolve(config.input.path), 'utf8');
+            let object = unnestify(objectify(Parse(kicadNetlist)));
+
+            object.export.$ = { version: object.export.version };
+            object.export.design = [object.export.design];
+            object.export.design[0].sheet = [object.export.design[0].sheet];
+            object.export.design[0].sheet[0].title_block = [object.export.design[0].sheet[0].title_block];
+            object.export.design[0].sheet[0].title_block[0].comment.forEach((x) => {
+                x.$ = {
+                    value: x.value.toString()
+                }
+                delete x.value;
+            })
+            delete object.export.version;
+
+            object.export.components = [object.export.components];
+            object.export.components[0].comp.forEach((Part) => {
+                Part.$ = {
+                    ref: Part.ref
+                }
+                delete Part.ref;
+
+                Part.footprint = [Part.footprint];
+                Part.value = [Part.value];
+                Part.datasheet = [Part.datasheet];
+
+                if (Part.fields) {
+                    Part.fields = [Part.fields];
+                    Part.fields.forEach(value => {
+                        if (value.field && value.field.length) {
+                            value.field.forEach((value) => {
+                                value.$ = { name: value.name.toString() };
+                            });
+                        }
+                    });
+                }
+            });
+
+            Components.inputData = object;
+            Components.inputType = 'NET';
+            Components.version = Components.inputData.export.$.version;
+
+            if (Components.version !== KiCadXMLRevision) {
+                return reject('Incompatible KiCad XML version: Expected ' + KiCadXMLRevision + ' Found ' + Components.version)
+            }
+
+            // extract page information
+            Components.created = Components.inputData.export.design[0].date.toString();
+            Components.title = Components.inputData.export.design[0].sheet[0].title_block[0].title.toString();
+            Components.date = Components.inputData.export.design[0].sheet[0].title_block[0].date.toString();
+            Components.company = Components.inputData.export.design[0].sheet[0].title_block[0].company.toString();
+            Components.revision = Components.inputData.export.design[0].sheet[0].title_block[0].rev.toString();
+            Components.comment = [
+                Components.inputData.export.design[0].sheet[0].title_block[0].comment[0].$.value,
+                Components.inputData.export.design[0].sheet[0].title_block[0].comment[1].$.value,
+                Components.inputData.export.design[0].sheet[0].title_block[0].comment[2].$.value,
+                Components.inputData.export.design[0].sheet[0].title_block[0].comment[3].$.value,
+            ];
+            return resolve(Components);
+        } catch (err) {
+            return reject(err);
         }
     });
+}
+
+async function LoadAndProcessComponentList(config) {
+
+    var TheLoaded = null
+    // check if this is a supported file type
+
+    switch (config.input.ext.toUpperCase()) {
+        case '.XML':
+            TheLoaded = LoadComponentFromXML
+            break;
+        case '.NET':
+            TheLoaded = LoadComponentFromNET
+            break;
+        default:
+            return reject('input file not supported')
+    }
+
+    try {
+        // run the file loaded
+        await TheLoaded(config);
+        ExtractAndSortComponents(config);
+        ApplaySort(config);
+        return Components;
+    } catch (error) {
+        Common.Error(error);
+        return;
+    }
 }
 
 module.exports = {

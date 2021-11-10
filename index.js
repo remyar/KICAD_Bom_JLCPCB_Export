@@ -1,7 +1,5 @@
 try {
     require('xml2js');
-    require('dotenv').config();
-
     RunProcess();
 
 } catch (e) {
@@ -21,6 +19,7 @@ try {
 }
 
 async function RunProcess() {
+    require('dotenv').config();
     const Path = require('path');
     const Common = require('./libs/common.js');
     const ConfigClass = require('./libs/configuration.js').Init(process.cwd(), Path.join(__dirname, '/Template/'));
@@ -29,6 +28,10 @@ async function RunProcess() {
     const ExportClass = require('./libs/export.js');
 
     Common.Message('KiCad_BOM_JLCPCB_Wizard Rev: ' + (process.env.PLUGIN_VERSION ? process.env.PLUGIN_VERSION : '0.0.0'));
+
+    if ( process.env.OUTPUT_FILE_EXTENSION ){
+        process.argv[2] = process.argv[2].substring(0, process.argv[2].lastIndexOf('.')) + process.env.OUTPUT_FILE_EXTENSION;
+    }
 
     Configuration = ConfigClass.Load(process.argv[2]);
 
