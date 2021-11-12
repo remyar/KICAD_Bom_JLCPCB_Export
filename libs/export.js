@@ -90,16 +90,28 @@ function GenerateTable(component, template) {
                 RefTemp += GroupdName + component.GroupedList[GroupdName][Item].Ref[RefIndex] + ' '
             }
 
-            if (RowIsEvenFlag) {
-                TempRow = TempRow.replace(/<!--ROW_CLASS_ODD_EVEN_TAG-->/g, 'RowEvenTag')
-            } else {
-                TempRow = TempRow.replace(/<!--ROW_CLASS_ODD_EVEN_TAG-->/g, 'RowOddTag')
+            if ( TempRow.includes("<!--ROW_CLASS_ODD_EVEN_TAG-->")){
+                if (RowIsEvenFlag) {
+                    TempRow = TempRow.replace(/<!--ROW_CLASS_ODD_EVEN_TAG-->/g, 'RowEvenTag');
+                } else {
+                    TempRow = TempRow.replace(/<!--ROW_CLASS_ODD_EVEN_TAG-->/g, 'RowOddTag');
+                }
             }
-            TempRow = TempRow.replace(/<!--ROW_PART_REF-->/g, RefTemp)
-            TempRow = TempRow.replace(/<!--ROW_PART_QTY-->/g, component.GroupedList[GroupdName][Item].Count)
-            TempRow = TempRow.replace(/<!--ROW_PART_VALUE-->/g, component.GroupedList[GroupdName][Item].Value)
-            TempRow = TempRow.replace(/<!--ROW_PART_FOOTPRINT-->/g, component.GroupedList[GroupdName][Item].Footprint)
-            TempRow = TempRow.replace(/<!--ROW_PART_DATASHEET-->/g, component.GroupedList[GroupdName][Item].Datasheet)
+            if ( TempRow.includes("<!--ROW_PART_REF-->")){
+                TempRow = TempRow.replace(/<!--ROW_PART_REF-->/g, RefTemp);
+            }
+            if ( TempRow.includes("<!--ROW_PART_QTY-->")){
+                TempRow = TempRow.replace(/<!--ROW_PART_QTY-->/g, component.GroupedList[GroupdName][Item].Count);
+            }
+            if ( TempRow.includes("<!--ROW_PART_VALUE-->")){
+                TempRow = TempRow.replace(/<!--ROW_PART_VALUE-->/g, component.GroupedList[GroupdName][Item].Value);
+            }
+            if ( TempRow.includes("<!--ROW_PART_FOOTPRINT-->")){
+                TempRow = TempRow.replace(/<!--ROW_PART_FOOTPRINT-->/g, component.GroupedList[GroupdName][Item].Footprint);
+            }
+            if ( TempRow.includes("<!--ROW_PART_DATASHEET-->")){
+                TempRow = TempRow.replace(/<!--ROW_PART_DATASHEET-->/g, component.GroupedList[GroupdName][Item].Datasheet);
+            }
 
             TempRow = TempRow.replace(/<!--HEADER_CLASS_REF_TAG-->/g, 'HeadRefTag')
             TempRow = TempRow.replace(/<!--HEADER_CLASS_QTY_TAG-->/g, 'HeadQtyTag')

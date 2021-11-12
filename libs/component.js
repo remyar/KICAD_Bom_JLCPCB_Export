@@ -433,21 +433,31 @@ async function LoadComponentFromNET(config) {
 
             object.export.components = [object.export.components];
             object.export.components[0].comp.forEach((Part) => {
+                
                 Part.$ = {
                     ref: Part.ref
                 }
                 delete Part.ref;
 
                 Part.footprint = [Part.footprint];
-                Part.value = [Part.value];
+                Part.value = [Part.value.replace(',' , ':')];
                 Part.datasheet = [Part.datasheet];
 
                 if (Part.fields) {
                     Part.fields = [Part.fields];
                     Part.fields.forEach(value => {
+                        if ( value.field == undefined ){
+                            value.field = [{
+                                $ : value.$[1],
+                                name : value[1]
+                            }];
+                        }
                         if (value.field && value.field.length) {
                             value.field.forEach((value) => {
-                                value.$ = { name: value.name.toString() };
+                                value['_'] = value.$.replace(',' , ':');
+                                value.$ = {
+                                    name: value.name.toString(),
+                                };
                             });
                         }
                     });
